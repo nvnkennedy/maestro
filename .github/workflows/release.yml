@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt build
+          npm install --prefix frontend --no-audit --no-fund
+      - name: Run tests
+        run: python -m pytest tests/ -q
+      - name: Build wheel (UI + backend, no binaries)
+        run: python scripts/build_pypi.py
+      - name: Attach wheel to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+          generate_release_notes: true

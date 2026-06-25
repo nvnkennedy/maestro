@@ -1,0 +1,29 @@
+{
+  "name": "power",
+  "display_name": "Bench power",
+  "version": "2.0.0",
+  "type": "adapter",
+  "description": "Drive bench power (normal/EDL cycles, on/off) by calling your power_control.py script. Simulated when no script is configured, so test design works without a bench.",
+  "powered_by": { "tool": "your power_control.py script" },
+  "capabilities": [
+    "normal_power_cycle",
+    "edl_power_cycle",
+    "power_off_edl_off",
+    "power_on_edl_off",
+    "power_on_edl_on",
+    "power_on",
+    "power_off",
+    "power_cycle",
+    "status",
+    "run",
+    "check"
+  ],
+  "capability_groups": {
+    "Power cycles": ["normal_power_cycle", "edl_power_cycle", "power_cycle"],
+    "EDL states": ["power_off_edl_off", "power_on_edl_off", "power_on_edl_on"],
+    "On / off": ["power_on", "power_off"],
+    "Status": ["status", "check", "run"]
+  },
+  "dependencies": [],
+  "entry_point": "adapter:PowerScriptAdapter"
+}

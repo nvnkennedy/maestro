@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Colors are stored as RGB triplets so Tailwind opacity modifiers work. */
+/* Light is the default — a soft, low-glare neutral palette (warm-tinted, not
+   stark white) so long sessions stay easy on the eyes. */
+:root {
+  --color-primary: 37 99 235;       /* blue-600 */
+  --color-secondary: 13 148 136;    /* teal-600 accent */
+  --color-success: 22 163 74;       /* green-600 */
+  --color-warning: 202 138 4;
+  --color-error: 220 38 38;
+  --color-info: 2 132 199;
+  --color-background: 238 240 244;  /* dimmed neutral, no glare */
+  --color-surface: 250 250 252;     /* off-white card, not pure #fff */
+  --color-surface-2: 232 235 240;
+  --color-border: 214 219 227;
+  --color-text-primary: 24 29 39;
+  --color-text-secondary: 71 82 99;
+  --color-text-muted: 124 134 150;
+  --color-on-primary: 255 255 255;  /* text/icon color that sits on bg-primary */
+}
+
+/* Dark — neutral slate (desaturated, not navy-blue) for a calmer surface. */
+.dark {
+  --color-primary: 59 130 246;      /* blue-500 — keeps white button text legible */
+  --color-secondary: 45 212 191;    /* teal-300 accent */
+  --color-success: 34 197 94;
+  --color-warning: 245 158 11;
+  --color-error: 248 113 113;
+  --color-info: 56 189 248;
+  --color-background: 18 20 26;      /* near-neutral charcoal (was navy-blue) */
+  --color-surface: 28 31 39;
+  --color-surface-2: 38 42 52;
+  --color-border: 52 57 69;
+  --color-text-primary: 232 235 241;
+  --color-text-secondary: 197 203 214;
+  --color-text-muted: 146 153 166;
+  --color-on-primary: 255 255 255;
+}
+
+body {
+  @apply bg-background text-text-primary font-sans antialiased;
+}
+
+* {
+  border-color: rgb(var(--color-border));
+}
+
+/* Native select popups follow the OS theme — force readable colors. */
+select {
+  color: rgb(var(--color-text-primary));
+}
+option {
+  background-color: rgb(var(--color-surface));
+  color: rgb(var(--color-text-primary));
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .card {
+    @apply bg-surface/70 border border-border/50 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.12)];
+  }
+  .section-title {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-text-muted;
+  }
+  .btn {
+    @apply inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium
+      transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none
+      focus:outline-none focus:ring-2 focus:ring-primary/50;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white hover:opacity-90 active:scale-[0.98];
+  }
+  .btn-outline {
+    @apply btn border border-border bg-transparent hover:bg-surface-2;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-surface-2;
+  }
+  .btn-danger {
+    @apply btn bg-error text-white hover:opacity-90;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg bg-background border border-border text-sm
+      focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-text-muted;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-text-muted mb-1.5;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+}

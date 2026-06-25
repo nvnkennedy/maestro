@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Maestro — automotive test automation">
+  <defs>
+    <linearGradient id="m-wheel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="m-screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="m-link" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- continuous contour line linking wheel rim to the head unit -->
+  <path d="M27 23 C 40 16, 52 18, 57 24" fill="none" stroke="url(#m-link)"
+        stroke-width="2.4" stroke-linecap="round"/>
+
+  <!-- steering wheel -->
+  <circle cx="20" cy="36" r="13" fill="none" stroke="url(#m-wheel)" stroke-width="3.4"/>
+  <circle cx="20" cy="36" r="3.4" fill="url(#m-wheel)"/>
+  <g stroke="url(#m-wheel)" stroke-width="3" stroke-linecap="round">
+    <line x1="9" y1="36" x2="16.8" y2="36"/>
+    <line x1="23.2" y1="36" x2="31" y2="36"/>
+    <line x1="20" y1="39.4" x2="20" y2="47"/>
+  </g>
+
+  <!-- infotainment head unit / centre console -->
+  <rect x="35" y="27" width="21" height="16" rx="3.2" fill="url(#m-screen)"/>
+  <g fill="#ffffff" fill-opacity="0.92">
+    <rect x="38" y="30.5" width="3.2" height="3.2" rx="1"/>
+    <rect x="43" y="30.5" width="3.2" height="3.2" rx="1"/>
+    <rect x="48" y="30.5" width="3.2" height="3.2" rx="1"/>
+    <rect x="38" y="36" width="3.2" height="3.2" rx="1"/>
+    <rect x="43" y="36" width="3.2" height="3.2" rx="1"/>
+    <rect x="48" y="36" width="3.2" height="3.2" rx="1"/>
+  </g>
+
+  <!-- control knob -->
+  <circle cx="59.5" cy="40" r="3.4" fill="#F59E0B"/>
+  <circle cx="59.5" cy="40" r="1.3" fill="#fff" fill-opacity="0.85"/>
+</svg>

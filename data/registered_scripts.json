@@ -1,0 +1,24 @@
+[
+  {
+    "id": "power_control",
+    "name": "Power control",
+    "path": "C:/bench/power_control.py",
+    "interpreter": "",
+    "description": "",
+    "commands": [
+      {
+        "label": "normal",
+        "args": [
+          "normal_power_cycle"
+        ]
+      },
+      {
+        "label": "set state",
+        "args": [
+          "set_state",
+          "normal_operation"
+        ]
+      }
+    ]
+  }
+]

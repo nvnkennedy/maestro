@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maestro-automation"
+dynamic = ["version"]
+description = "Maestro — Automotive Test Automation Framework (web dashboard + adapters)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Maestro Team" }]
+keywords = ["test-automation", "automotive", "ssh", "adb", "dlt", "ecu"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.5",
+    "apscheduler>=3.10,<4",
+    "paramiko>=2.11",
+    "cryptography>=42.0",
+    "websockets>=11.0",
+    "pyserial>=3.5",
+    "structlog>=24.1",
+    "prometheus-client>=0.20",
+    "turboadb>=1.0.5",
+    "turbossh>=1.2.16",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "build",
+    "twine",
+    "ruff>=0.6",
+    "mypy>=1.8",
+    "pre-commit>=3.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/maestro"
+
+[project.scripts]
+maestro = "backend.cli:main"
+maestro-setup = "backend.installer:run_setup"
+
+[tool.setuptools.dynamic]
+version = { attr = "backend.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.setuptools.package-data]
+backend = [
+    "templates/*.json",
+    "adapters/*/manifest.json",
+    "_bundled/**/*",
+]
+
+[tool.black]
+line-length = 90
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 90
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["build", "dist", "frontend", "backend/_bundled"]
+
+[tool.ruff.lint]
+# Real-bug + hygiene rules the codebase already satisfies. Line length is left to
+# the formatter (not blocking). Ratchet up (UP, B, SIM, C4) over time.
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.10"
+# Maestro is a Windows-targeted app (winreg, os.startfile, etc.), so type-check
+# as win32 — otherwise CI's Linux runner flags those Windows-only APIs.
+platform = "win32"
+ignore_missing_imports = true
+warn_unused_ignores = false
+exclude = ['(^|/)(build|dist|tests)/']
+
+# Incremental typing: these modules carry pre-existing type debt and are checked
+# loosely for now; newly written code is type-clean. Remove a module as it's tidied.
+[[tool.mypy.overrides]]
+module = [
+    "backend.services.test_executor",
+    "backend.api.scheduling",
+    "backend.services.scheduler_service",
+    "backend.services.report_generator",
+    "backend.services.project_service",
+    "backend.api.test_cases",
+    "backend.database",
+]
+ignore_errors = true

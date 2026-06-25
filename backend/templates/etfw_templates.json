@@ -1,0 +1,6 @@
+[
+  { "label": "Bus sleep — on", "description": "Put the vehicle bus to sleep (calls your etfw.py bus_sleep_on). Simulated if no script is set.", "category": "Bus sleep", "tags": ["etfw", "bus", "sleep", "can"], "action": "etfw.bus_sleep_on", "parameters": { "script_path": "C:/bench/etfw.py" }, "timeout_seconds": 60 },
+  { "label": "Bus sleep — off", "description": "Wake the vehicle bus back up (calls your etfw.py bus_sleep_off).", "category": "Bus sleep", "tags": ["etfw", "bus", "wake", "can"], "action": "etfw.bus_sleep_off", "parameters": { "script_path": "C:/bench/etfw.py" }, "timeout_seconds": 60 },
+  { "label": "Set ECU state", "description": "Send a named ECU state to your etfw.py script (e.g. normal_operation).", "category": "ECU state", "tags": ["etfw", "ecu", "state"], "action": "etfw.set_state", "parameters": { "script_path": "C:/bench/etfw.py", "state": "normal_operation" }, "timeout_seconds": 60 },
+  { "label": "Get ECU state", "description": "Read back the current ECU/bus state from your etfw.py script.", "category": "ECU state", "tags": ["etfw", "ecu", "state", "read"], "action": "etfw.get_state", "parameters": { "script_path": "C:/bench/etfw.py" }, "timeout_seconds": 30 }
+]

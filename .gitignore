@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Runtime data (keep directory structure, ignore contents)
+data/*.db
+data/*.db-*
+data/*.db.bak
+data/*.bak
+data/.vault.key
+data/logs/*
+data/reports/*
+data/artifacts/*
+data/plugins/*
+!data/logs/.gitkeep
+!data/reports/.gitkeep
+!data/artifacts/.gitkeep
+!data/plugins/.gitkeep
+
+# Bundled binaries (ffmpeg etc.) — keep the folder + README, ignore the exes
+bin/*
+!bin/README.md
+
+# Environment & secrets
+.env
+*.key
+
+# OS / editor / tooling
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+
+# Build artifacts
+build/
+dist/
+dist_pkg/
+build_pkg/
+backend/_bundled/
+*.egg-info/
+*.zip

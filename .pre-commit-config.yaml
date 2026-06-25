@@ -1,0 +1,19 @@
+# Maestro pre-commit hooks.  Install once:  pre-commit install
+# Runs the same lint gate as CI on staged files, plus basic hygiene + a
+# large-file guard (so the 600 MB ffmpeg / adb binaries can't be committed).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]

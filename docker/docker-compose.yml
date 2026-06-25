@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - maestro-data:/app/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+
+  # Optional split frontend behind nginx (the backend image already serves
+  # the UI on :8000 — enable this profile only for scaled deployments).
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    profiles: ["split"]
+    restart: unless-stopped
+
+volumes:
+  maestro-data:

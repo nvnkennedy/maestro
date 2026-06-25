@@ -1,0 +1,33 @@
+{
+  "name": "adb",
+  "display_name": "Android (ADB)",
+  "version": "2.0.0",
+  "type": "adapter",
+  "description": "Control Android / automotive head units over ADB — shell, files, app install, logcat and screen capture. Powered by your turboadb tool (which finds or fetches adb for you).",
+  "powered_by": { "tool": "turboadb", "module": "turboadb" },
+  "capabilities": [
+    "list_devices",
+    "shell",
+    "push",
+    "pull",
+    "install_apk",
+    "uninstall_apk",
+    "logcat_dump",
+    "logcat_clear",
+    "screenshot",
+    "screenrecord",
+    "reboot",
+    "wait_for_device",
+    "connect_wireless",
+    "device_info"
+  ],
+  "capability_groups": {
+    "Devices": ["list_devices", "device_info", "connect_wireless", "wait_for_device", "reboot"],
+    "Shell": ["shell"],
+    "Files & apps": ["push", "pull", "install_apk", "uninstall_apk"],
+    "Logs": ["logcat_dump", "logcat_clear"],
+    "Capture": ["screenshot", "screenrecord"]
+  },
+  "dependencies": ["turboadb>=1.0.5"],
+  "entry_point": "adapter:ADBAdapter"
+}

@@ -1,0 +1,7 @@
+[
+  { "label": "Ignition OFF", "description": "Sets the ignition line OFF via your power script (needs script_path on the power device config; uses --ignition off).", "category": "Ignition", "tags": ["ignition", "off", "power"], "action": "power.power_off", "parameters": { "extra_args": ["--ignition", "off"] }, "timeout_seconds": 60 },
+  { "label": "Ignition LOCK", "description": "Sets the ignition to LOCK via your power script (--ignition lock).", "category": "Ignition", "tags": ["ignition", "lock", "power"], "action": "power.status", "parameters": { "extra_args": ["--ignition", "lock"] }, "timeout_seconds": 60 },
+  { "label": "Ignition ON", "description": "Sets the ignition ON (run position) via your power script (--ignition on).", "category": "Ignition", "tags": ["ignition", "on", "run", "power"], "action": "power.power_on", "parameters": { "extra_args": ["--ignition", "on"] }, "timeout_seconds": 60 },
+  { "label": "Ignition ACCESSORY", "description": "Sets the ignition to ACCESSORY via your power script (--ignition accessory).", "category": "Ignition", "tags": ["ignition", "accessory", "acc", "power"], "action": "power.power_on", "parameters": { "extra_args": ["--ignition", "accessory"] }, "timeout_seconds": 60 },
+  { "label": "Ignition START (crank)", "description": "Pulses the ignition START/crank position via your power script (--ignition start).", "category": "Ignition", "tags": ["ignition", "start", "crank", "power"], "action": "power.power_on", "parameters": { "extra_args": ["--ignition", "start"] }, "timeout_seconds": 60 }
+]

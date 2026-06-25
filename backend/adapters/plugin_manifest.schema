@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Maestro Plugin Manifest",
+  "type": "object",
+  "required": ["name", "version", "type", "entry_point"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Unique plugin identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["adapter", "validator", "reporter"],
+      "description": "Plugin category"
+    },
+    "description": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Action names this plugin provides"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "pip requirement specifiers"
+    },
+    "entry_point": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.]+:[A-Za-z0-9_]+$",
+      "description": "module:ClassName inside the plugin package"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "serial",
+  "version": "1.0.0",
+  "type": "adapter",
+  "description": "Serial console monitoring and text pattern matching",
+  "capabilities": ["monitor", "wait_for_pattern", "send", "list_ports"],
+  "dependencies": ["pyserial>=3.5"],
+  "entry_point": "adapter:SerialConsoleAdapter"
+}

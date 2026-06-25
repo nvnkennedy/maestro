@@ -1,0 +1,9 @@
+{
+  "name": "system",
+  "version": "1.0.0",
+  "type": "adapter",
+  "description": "Local utility steps: wait, echo, assert, sandboxed scripts",
+  "capabilities": ["wait", "echo", "assert_contains", "run_script", "fail"],
+  "dependencies": [],
+  "entry_point": "adapter:SystemAdapter"
+}
