@@ -623,6 +623,17 @@ export function TestCaseDesigner() {
 
   const rows = draft ? buildRows(draft.steps) : [];
 
+  // The test's chosen Run location (Run Target). ssh/adb steps default to it, so
+  // the editor/canvas can frame per-step binding as an optional override and only
+  // warn about a missing target when it actually matters (local ssh).
+  const runTarget = draft?.defaultTargetId
+    ? targets.find((t) => t.id === draft.defaultTargetId)
+    : undefined;
+  const runTargetLabel = draft?.defaultTargetId
+    ? (runTarget?.label ?? 'the selected target')
+    : 'Local (this machine)';
+  const runTargetIsRemote = runTarget?.settings?.kind === 'remote';
+
   // ---- parallel grouping (via buttons, not fragile drag-onto) --------------------------
 
   const mergeUp = (rowIndex: number) => {
@@ -1371,10 +1382,12 @@ export function TestCaseDesigner() {
                       <Lock size={12} /> Unlock to edit
                     </button>
                   )}
-                  <label className="ml-auto flex items-center gap-1.5 text-[11px] text-text-muted">
-                    Run on
+                  <label className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+                    <span className="rounded-md bg-primary/10 px-1.5 py-1 text-primary">
+                      ▶ Run location
+                    </span>
                     <select
-                      className="input h-7 py-0 text-xs"
+                      className="input h-8 py-0 text-xs font-medium"
                       value={draft.defaultTargetId ?? ''}
                       disabled={locked}
                       onChange={(e) => {
@@ -1383,7 +1396,7 @@ export function TestCaseDesigner() {
                         setDraft({ ...draft, defaultTargetId: value });
                         setDirty(true);
                       }}
-                      title="Where this test runs: Local, or a saved remote/RDP target"
+                      title="Where this whole test runs — Local, or a saved remote/RDP target. Every ssh/adb step uses this unless you override it on the step."
                     >
                       <option value="">Local (this machine)</option>
                       {targets.map((t) => (
@@ -1436,6 +1449,7 @@ export function TestCaseDesigner() {
                   <FlowCanvasRF
                     steps={draft.steps}
                     onChange={mutateSteps}
+                    runTargetIsRemote={runTargetIsRemote}
                     onEdit={(index) => setEditingIndex(index)}
                     onBranch={(index) => setBranchIndex(index)}
                     onAdd={() =>
@@ -1455,6 +1469,7 @@ export function TestCaseDesigner() {
                   <FlowCanvas
                     steps={draft.steps}
                     onChange={mutateSteps}
+                    runTargetIsRemote={runTargetIsRemote}
                     onEdit={(index) => setEditingIndex(index)}
                     onBranch={(index) => setBranchIndex(index)}
                     onAdd={() =>
@@ -1607,6 +1622,7 @@ export function TestCaseDesigner() {
       {/* Modals */}
       <StepEditModal
         step={editingIndex !== null && draft ? draft.steps[editingIndex] : null}
+        runTargetLabel={runTargetLabel}
         onClose={() => setEditingIndex(null)}
         onSave={(updated) => {
           if (editingIndex === null || !draft) return;

@@ -33,10 +33,12 @@ const ADAPTER_HUE: Record<string, string> = {
 };
 const hueOf = (action: string) => ADAPTER_HUE[action.split('.')[0] ?? ''] ?? 'bg-indigo-500';
 
-// Adapters that need a bound device target to connect (and send credentials).
-const NEEDS_TARGET = new Set(['ssh', 'adb']);
-const missingTarget = (step: TestStep) =>
-  NEEDS_TARGET.has(step.action.split('.')[0] ?? '') &&
+// A step lacks a usable target only when it's SSH, the run isn't routed to a
+// remote host, and it isn't bound to a device — i.e. it has nowhere to connect.
+// adb runs against the local device; a remote Run location routes steps there.
+const missingTarget = (step: TestStep, runTargetIsRemote: boolean) =>
+  !runTargetIsRemote &&
+  step.action.startsWith('ssh.') &&
   step.parameters?.device_config_id == null;
 
 interface FlowCanvasProps {
@@ -45,6 +47,8 @@ interface FlowCanvasProps {
   onEdit: (index: number) => void;
   onBranch: (index: number) => void;
   onAdd: () => void;
+  /** True when the test's Run location is a remote/RDP host (steps route there). */
+  runTargetIsRemote?: boolean;
 }
 
 /** Lay every node out in a tidy top-down column (used as a fallback + Tidy). */
@@ -52,7 +56,14 @@ function autoPos(index: number): Pos {
   return { x: COL_X, y: TOP_Y + index * ROW_GAP };
 }
 
-export function FlowCanvas({ steps, onChange, onEdit, onBranch, onAdd }: FlowCanvasProps) {
+export function FlowCanvas({
+  steps,
+  onChange,
+  onEdit,
+  onBranch,
+  onAdd,
+  runTargetIsRemote = false,
+}: FlowCanvasProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(1);
@@ -511,12 +522,12 @@ export function FlowCanvas({ steps, onChange, onEdit, onBranch, onAdd }: FlowCan
                       >
                         ⏱ {fmtTimeout(step.timeout_seconds)}
                       </button>
-                      {missingTarget(step) && (
+                      {missingTarget(step, runTargetIsRemote) && (
                         <button
                           className="rounded-md border border-amber-500/60 bg-amber-500/15 px-1 py-px text-[10px] font-bold text-amber-600"
                           onClick={() => onEdit(index)}
                           onPointerDown={(e) => e.stopPropagation()}
-                          title="No device target bound — click to pick one (needed to connect & send credentials)"
+                          title="SSH step with no target: set a remote Run location, or click to bind a target on this step"
                         >
                           ⚠ no target
                         </button>

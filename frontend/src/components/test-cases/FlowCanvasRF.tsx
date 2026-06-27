@@ -46,9 +46,11 @@ const ADAPTER_HUE: Record<string, string> = {
   system: 'bg-sky-500',
 };
 const hueOf = (action: string) => ADAPTER_HUE[action.split('.')[0] ?? ''] ?? 'bg-indigo-500';
-const NEEDS_TARGET = new Set(['ssh', 'adb']);
-const missingTarget = (s: TestStep) =>
-  NEEDS_TARGET.has(s.action.split('.')[0] ?? '') && s.parameters?.device_config_id == null;
+// A step lacks a usable target only when it's SSH, the run isn't routed to a
+// remote host, and it isn't bound to a device — i.e. it has nowhere to connect.
+// adb runs against the local device; a remote Run location routes steps there.
+const warnsNoTarget = (s: TestStep, runTargetIsRemote: boolean) =>
+  !runTargetIsRemote && s.action.startsWith('ssh.') && s.parameters?.device_config_id == null;
 
 const nodeId = (step: TestStep, index: number) => uidOf(step) || `idx-${index}`;
 const autoPos = (index: number) => ({ x: COL_X, y: TOP_Y + index * ROW_GAP });
@@ -59,18 +61,21 @@ interface FlowCanvasProps {
   onEdit: (index: number) => void;
   onBranch: (index: number) => void;
   onAdd: () => void;
+  /** True when the test's Run location is a remote/RDP host (steps route there). */
+  runTargetIsRemote?: boolean;
 }
 
 type StepNodeData = {
   step: TestStep;
   index: number;
+  warnNoTarget: boolean;
   onEdit: (index: number) => void;
   onBranch: (index: number) => void;
   onDelete: (index: number) => void;
 };
 
 function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
-  const { step, index, onEdit, onBranch, onDelete } = data;
+  const { step, index, warnNoTarget, onEdit, onBranch, onDelete } = data;
   const label = String(step.parameters?._label ?? '') || step.action;
   const hasBranch = branchOf(step) != null;
   return (
@@ -100,10 +105,10 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
           </div>
           <div className="mt-0.5 flex items-center gap-1.5">
             <ActionChip action={step.action} />
-            {missingTarget(step) && (
+            {warnNoTarget && (
               <span
                 className="rounded border border-amber-500/60 bg-amber-500/15 px-1 text-[10px] font-bold text-amber-600"
-                title="No device target bound — open the step to pick one"
+                title="SSH step with no target: set a remote Run location, or bind a target on this step"
               >
                 ⚠ no target
               </span>
@@ -150,7 +155,7 @@ function StepNode({ data, selected }: NodeProps<Node<StepNodeData>>) {
 
 const nodeTypes = { maestro: StepNode };
 
-function InnerCanvas({ steps, onChange, onEdit, onBranch, onAdd }: FlowCanvasProps) {
+function InnerCanvas({ steps, onChange, onEdit, onBranch, onAdd, runTargetIsRemote = false }: FlowCanvasProps) {
   // Stable callback wrappers so node `data` identity doesn't churn every render
   // (which would otherwise re-seed nodes in a loop).
   const cbRef = useRef({ onEdit, onBranch, onDelete: (i: number) => onChange(steps.filter((_, k) => k !== i)) });
@@ -170,9 +175,9 @@ function InnerCanvas({ steps, onChange, onEdit, onBranch, onAdd }: FlowCanvasPro
         id: nodeId(step, index),
         type: 'maestro',
         position: posOf(step) ?? autoPos(index),
-        data: { step, index, ...stable },
+        data: { step, index, warnNoTarget: warnsNoTarget(step, runTargetIsRemote), ...stable },
       })),
-    [steps, stable],
+    [steps, stable, runTargetIsRemote],
   );
 
   const buildEdges = useCallback((): Edge[] => {

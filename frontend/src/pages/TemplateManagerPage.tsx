@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Copy, FileCode2, Plus, Save, Terminal, Trash2 } from 'lucide-react';
+import { Copy, FileCode2, Pencil, Plus, Save, Terminal, Trash2 } from 'lucide-react';
 import { MainLayout } from '../components/layout/MainLayout';
+import { ActionChip } from '../components/common/ActionChip';
 import { Modal } from '../components/common/Modal';
 import { Spinner } from '../components/common/Spinner';
 import { useToast } from '../components/common/Toast';
+import { StepEditModal } from '../components/test-cases/StepEditModal';
 import { useApi } from '../hooks/useApi';
 import {
   deleteScript,
@@ -16,8 +18,20 @@ import {
   type RegisteredScript,
   type UserTemplate,
 } from '../services/api';
-import type { StepTemplate } from '../types/domain';
-import { ACTION_OPTIONS } from '../utils/actions';
+import type { StepTemplate, TestStep } from '../types/domain';
+import { prettyParamName } from '../utils/actions';
+
+/** A short plain-English preview of a template's settings (no JSON dump). */
+function summarizeParams(params: Record<string, unknown>): string {
+  const entries = Object.entries(params || {}).filter(
+    ([k]) => !k.startsWith('_') && k !== 'device_config_id',
+  );
+  if (!entries.length) return 'No extra settings';
+  const parts = entries
+    .slice(0, 4)
+    .map(([k, v]) => `${prettyParamName(k)}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`);
+  return parts.join(' · ') + (entries.length > 4 ? ' …' : '');
+}
 
 // ---- Registered scripts (power/etfw/dlt subcommand scripts) -------------------
 
@@ -191,46 +205,25 @@ function ScriptsPanel() {
 function TemplatesPanel() {
   const toast = useToast();
   const { data: templates, loading, refetch } = useApi(listUserTemplates, []);
-  const [editing, setEditing] = useState<UserTemplate | 'new' | null>(null);
-  const [form, setForm] = useState<UserTemplate>({
-    group: 'Custom',
-    label: '',
+  // Design templates with the same friendly editor used for real steps — no JSON.
+  const [designing, setDesigning] = useState<
+    { step: TestStep; id?: string; group: string } | null
+  >(null);
+
+  const blankStep = (): TestStep => ({
+    step_number: 1,
     action: 'system.echo',
-    parameters: {},
+    parameters: { _label: '' },
     timeout_seconds: 30,
+    retry_count: 0,
   });
-  const [paramsText, setParamsText] = useState('{}');
-  const [paramsError, setParamsError] = useState<string | null>(null);
-
-  const open = (tpl: UserTemplate | 'new') => {
-    if (tpl === 'new') {
-      setForm({ group: 'Custom', label: '', action: 'system.echo', parameters: {}, timeout_seconds: 30 });
-      setParamsText('{}');
-    } else {
-      setForm(tpl);
-      setParamsText(JSON.stringify(tpl.parameters ?? {}, null, 2));
-    }
-    setParamsError(null);
-    setEditing(tpl);
-  };
-
-  const save = async () => {
-    let parameters: Record<string, unknown>;
-    try {
-      parameters = JSON.parse(paramsText || '{}');
-    } catch {
-      setParamsError('Parameters must be valid JSON');
-      return;
-    }
-    try {
-      await saveUserTemplate({ ...form, parameters });
-      toast('success', 'Template saved');
-      setEditing(null);
-      void refetch();
-    } catch (err) {
-      toast('error', `Save failed: ${err instanceof Error ? err.message : err}`);
-    }
-  };
+  const stepFromTemplate = (tpl: UserTemplate): TestStep => ({
+    step_number: 1,
+    action: tpl.action,
+    parameters: { ...(tpl.parameters as Record<string, unknown>), _label: tpl.label },
+    timeout_seconds: tpl.timeout_seconds,
+    retry_count: 0,
+  });
 
   const remove = async (id?: string) => {
     if (!id || !window.confirm('Delete this template?')) return;
@@ -242,130 +235,67 @@ function TemplatesPanel() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-secondary">
-        Create your own palette items. They appear in the designer under the group
-        you choose, alongside the built-in templates.
+        Build your own palette items with the same visual editor as a test step — pick an
+        action and fill in plain-English settings (no JSON). They appear in the designer
+        palette under the group you choose.
       </p>
       {loading ? (
         <Spinner />
       ) : (
-        <div className="card p-4">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-[11px] uppercase text-text-muted">
-                <th className="px-2 py-1.5">Group</th>
-                <th className="px-2 py-1.5">Label</th>
-                <th className="px-2 py-1.5">Action</th>
-                <th className="px-2 py-1.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {(templates ?? []).map((tpl) => (
-                <tr key={tpl.id} className="border-b border-border/60 hover:bg-surface-2">
-                  <td className="px-2 py-1.5 text-text-secondary">{tpl.group}</td>
-                  <td className="px-2 py-1.5 font-medium">{tpl.label}</td>
-                  <td className="px-2 py-1.5 font-mono text-xs text-text-secondary">{tpl.action}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <button className="btn-ghost px-2 py-1 text-xs" onClick={() => open(tpl)}>
-                      Edit
-                    </button>
-                    <button
-                      className="btn-ghost p-1 text-error"
-                      onClick={() => void remove(tpl.id)}
-                      aria-label="Delete template"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {(templates ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-text-muted">
-                    No custom templates yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          <button className="btn-outline mt-3 px-3 py-1.5 text-xs" onClick={() => open('new')}>
-            <Plus size={13} /> New template
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {(templates ?? []).map((tpl) => (
+            <div key={tpl.id} className="card flex flex-col p-4">
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                  {tpl.group}
+                </span>
+                <ActionChip action={tpl.action} />
+              </div>
+              <div className="font-semibold">{tpl.label}</div>
+              <div className="mb-3 mt-0.5 line-clamp-2 text-xs text-text-muted">
+                {summarizeParams(tpl.parameters)}
+              </div>
+              <div className="mt-auto flex gap-2">
+                <button
+                  className="btn-outline flex-1 justify-center text-xs"
+                  onClick={() =>
+                    setDesigning({ step: stepFromTemplate(tpl), id: tpl.id, group: tpl.group })
+                  }
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  className="btn-danger text-xs"
+                  onClick={() => void remove(tpl.id)}
+                  aria-label="Delete template"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            className="flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border text-text-muted transition-colors hover:border-primary/50 hover:text-primary"
+            onClick={() => setDesigning({ step: blankStep(), group: 'My steps' })}
+          >
+            <Plus size={24} />
+            <span className="text-sm font-medium">Design a template</span>
           </button>
         </div>
       )}
 
-      <Modal
-        open={editing !== null}
-        title={editing === 'new' ? 'New template' : 'Edit template'}
-        onClose={() => setEditing(null)}
-        wide
-      >
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Palette group</label>
-              <input
-                className="input"
-                value={form.group}
-                onChange={(e) => setForm({ ...form, group: e.target.value })}
-                placeholder="e.g. My scripts"
-              />
-            </div>
-            <div>
-              <label className="label">Label</label>
-              <input
-                className="input"
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="e.g. Reset bench"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Action</label>
-              <select
-                className="input"
-                value={form.action}
-                onChange={(e) => setForm({ ...form, action: e.target.value })}
-              >
-                {ACTION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label} ({o.value})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Timeout (sec)</label>
-              <input
-                type="number"
-                className="input"
-                value={form.timeout_seconds}
-                min={1}
-                onChange={(e) => setForm({ ...form, timeout_seconds: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="label">Parameters (JSON)</label>
-            <textarea
-              className="input min-h-[120px] font-mono text-xs"
-              value={paramsText}
-              onChange={(e) => setParamsText(e.target.value)}
-              spellCheck={false}
-            />
-            {paramsError && <p className="mt-1 text-xs text-error">{paramsError}</p>}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button className="btn-outline" onClick={() => setEditing(null)}>
-              Cancel
-            </button>
-            <button className="btn-primary" onClick={save} disabled={!form.label}>
-              <Save size={14} /> Save
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <StepEditModal
+        step={designing?.step ?? null}
+        asTemplate
+        templateId={designing?.id}
+        initialGroup={designing?.group}
+        onSave={() => {}}
+        onClose={() => setDesigning(null)}
+        onTemplateSaved={() => {
+          toast('success', 'Template saved');
+          void refetch();
+        }}
+      />
     </div>
   );
 }
@@ -411,10 +341,17 @@ function BuiltinPanel() {
                 {items.map((tpl, i) => (
                   <div
                     key={`${group}-${i}`}
-                    className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2"
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-2"
                   >
-                    <span className="min-w-0 flex-1 truncate text-sm">{tpl.label}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-text-muted">{tpl.action}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium">{tpl.label}</span>
+                        <ActionChip action={tpl.action} />
+                      </div>
+                      <div className="truncate text-[11px] text-text-muted">
+                        {summarizeParams((tpl.parameters as Record<string, unknown>) ?? {})}
+                      </div>
+                    </div>
                     <button
                       className="btn-ghost shrink-0 px-2 py-0.5 text-xs text-cyan-400"
                       onClick={() => void clone(group, tpl)}

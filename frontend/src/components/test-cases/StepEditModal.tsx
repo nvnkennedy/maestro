@@ -1,16 +1,36 @@
-import { Paperclip, Plus, Trash2, Upload } from 'lucide-react';
+import { BookmarkPlus, Paperclip, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { useApi } from '../../hooks/useApi';
-import { listConfigs, uploadStepAttachment, type PlannedAttachment } from '../../services/api';
+import {
+  listConfigs,
+  saveUserTemplate,
+  uploadStepAttachment,
+  type PlannedAttachment,
+} from '../../services/api';
 import type { TestStep } from '../../types/domain';
-import { ACTION_OPTIONS, PARAM_HINTS, paramsForAction, prettyParamName } from '../../utils/actions';
+import {
+  ACTION_OPTIONS,
+  friendlyAction,
+  PARAM_HINTS,
+  paramsForAction,
+  prettyParamName,
+} from '../../utils/actions';
 import { Modal } from '../common/Modal';
 
 interface StepEditModalProps {
   step: TestStep | null;
   onSave: (step: TestStep) => void;
   onClose: () => void;
+  /** The test's chosen Run location (e.g. "Local (this machine)" or an RDP host),
+   *  so the step editor can show that ssh/adb steps default to it. */
+  runTargetLabel?: string;
+  /** Template-design mode: the same friendly editor, but the result is saved as a
+   *  reusable palette template instead of applied to a step in a test case. */
+  asTemplate?: boolean;
+  templateId?: string;
+  initialGroup?: string;
+  onTemplateSaved?: () => void;
 }
 
 type ParamValue = string | number | boolean;
@@ -38,7 +58,26 @@ const FILE_PARAM_KEYS = new Set([
 const isFileParam = (key: string) =>
   FILE_PARAM_KEYS.has(key) || key.endsWith('_path') || key.endsWith('_file');
 
-export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
+// Actions where one setting is essential. We always surface it (even when empty)
+// and flag it as required, so a step can't silently run without it — e.g.
+// system.run_file needs the script/.exe path, run_command needs the command.
+const REQUIRED_PARAM: Record<string, string> = {
+  'system.run_file': 'path',
+  'system.run_command': 'command',
+  'system.run_registered': 'script_id',
+  'system.run_script': 'script',
+};
+
+export function StepEditModal({
+  step,
+  onSave,
+  onClose,
+  runTargetLabel,
+  asTemplate = false,
+  templateId,
+  initialGroup,
+  onTemplateSaved,
+}: StepEditModalProps) {
   const { activeProjectId } = useProject();
   const { data: configs } = useApi(
     () => (activeProjectId ? listConfigs(activeProjectId) : Promise.resolve([])),
@@ -62,6 +101,13 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
   const [newKeyMode, setNewKeyMode] = useState<'pick' | 'custom'>('pick');
   const [canvasMeta, setCanvasMeta] = useState<Record<string, unknown>>({});
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  // "Save as template" — turn the configured step into a reusable palette item.
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateGroup, setTemplateGroup] = useState('My steps');
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateError, setTemplateError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fieldFileRef = useRef<HTMLInputElement>(null);
   const fieldTargetRef = useRef<number | null>(null);
@@ -129,6 +175,10 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
         complex[key] = value;
       }
     });
+    // Always surface a required setting (e.g. run_file's path) so it's visible
+    // and can be filled in — even on steps created without it.
+    const reqKey = REQUIRED_PARAM[step.action];
+    if (reqKey && !simple.some(([k]) => k === reqKey)) simple.push([reqKey, '']);
     setFields(simple);
     setExtraParams(complex);
     setAdvancedText(JSON.stringify(complex, null, 2));
@@ -138,7 +188,15 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
     setRetries(step.retry_count);
     setNewKey('');
     setJsonError(null);
-  }, [step]);
+    setUploadError(null);
+    setShowTemplateForm(false);
+    setTemplateSaved(false);
+    setTemplateError(null);
+    if (asTemplate) {
+      setTemplateGroup(initialGroup ?? 'My steps');
+      setTemplateName(String(step.parameters?._label ?? '') || friendlyAction(step.action));
+    }
+  }, [step, asTemplate, initialGroup]);
 
   // Configured targets matching this action's adapter (ssh.*, adb.*, ...).
   const adapter = action.split('.')[0] ?? '';
@@ -146,6 +204,22 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
     () => (configs ?? []).filter((config) => config.config_type === adapter),
     [configs, adapter],
   );
+
+  // The essential setting for this action (if any) and whether it's still empty.
+  const requiredKey = REQUIRED_PARAM[action];
+  const requiredMissing =
+    !!requiredKey && !fields.some(([k, v]) => k === requiredKey && String(v).trim() !== '');
+
+  // Switching action keeps its required setting visible so the user fills it in.
+  const handleActionChange = (next: string) => {
+    setAction(next);
+    const reqKey = REQUIRED_PARAM[next];
+    if (reqKey) {
+      setFields((current) =>
+        current.some(([k]) => k === reqKey) ? current : [...current, [reqKey, '']],
+      );
+    }
+  };
 
   // Settings offered in the "add setting" dropdown for this action — minus ones
   // already shown and the keys handled by dedicated UI above.
@@ -173,11 +247,16 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
     const index = fieldTargetRef.current;
     if (!files || files.length === 0 || index == null) return;
     setUploading(true);
+    setUploadError(null);
     try {
       const uploaded = await uploadStepAttachment(files[0]);
       setField(index, uploaded.path);
-    } catch {
-      /* keep the modal open on failure */
+    } catch (err) {
+      // Don't fail silently — a swallowed error here left the path empty, so the
+      // step looked configured but ran as "missing script".
+      setUploadError(
+        err instanceof Error ? err.message : 'Could not upload that file — check it and retry.',
+      );
     } finally {
       setUploading(false);
       fieldTargetRef.current = null;
@@ -185,18 +264,23 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
     }
   };
 
-  const handleSave = () => {
-    if (!step) return;
+  // Build the step's parameters from the form. Canvas-only metadata (position,
+  // id, branch wiring) is kept for a normal save but dropped when saving a
+  // reusable template. Returns null if the advanced JSON is invalid.
+  const collectParameters = (includeCanvasMeta: boolean): Record<string, unknown> | null => {
     let advanced: Record<string, unknown> = extraParams;
     if (showAdvanced) {
       try {
         advanced = JSON.parse(advancedText || '{}') as Record<string, unknown>;
       } catch {
         setJsonError('Advanced parameters must be valid JSON');
-        return;
+        return null;
       }
     }
-    const parameters: Record<string, unknown> = { ...advanced, ...canvasMeta };
+    const parameters: Record<string, unknown> = {
+      ...advanced,
+      ...(includeCanvasMeta ? canvasMeta : {}),
+    };
     fields.forEach(([key, value]) => {
       if (value !== '') parameters[key] = value;
     });
@@ -216,20 +300,60 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
     else if (flow === 'always') parameters._always_run = true;
     else if (flow.startsWith('parallel-'))
       parameters._parallel_group = flow.replace('parallel-', '');
+    return parameters;
+  };
+
+  const handleSave = () => {
+    if (!step) return;
+    const parameters = collectParameters(true);
+    if (parameters === null) return;
     onSave({ ...step, action, parameters, timeout_seconds: timeout, retry_count: retries });
     onClose();
+  };
+
+  // Save the configured step to the user's palette as a reusable template. A
+  // template carries no specific device binding or canvas position/branch wiring.
+  const saveAsTemplate = async () => {
+    const parameters = collectParameters(false);
+    if (parameters === null) return;
+    delete parameters.device_config_id;
+    setTemplateError(null);
+    try {
+      await saveUserTemplate({
+        ...(templateId ? { id: templateId } : {}),
+        group: templateGroup.trim() || 'My steps',
+        label: templateName.trim() || friendlyAction(action),
+        action,
+        parameters,
+        timeout_seconds: timeout,
+      });
+      setTemplateSaved(true);
+      setShowTemplateForm(false);
+      // In the Templates page, saving is the whole point — notify + close.
+      if (asTemplate) {
+        onTemplateSaved?.();
+        onClose();
+      }
+    } catch (err) {
+      setTemplateError(
+        err instanceof Error ? err.message : 'Could not save the template — try again.',
+      );
+    }
   };
 
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
+    setUploadError(null);
     try {
       const uploaded = await Promise.all(
         Array.from(files).map((file) => uploadStepAttachment(file)),
       );
       setAttachments((current) => [...current, ...uploaded]);
-    } catch {
-      /* surfaced via disabled state; keep the modal open */
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : 'Could not upload that file — check it and retry.',
+      );
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -239,7 +363,12 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
   const groups = [...new Set(ACTION_OPTIONS.map((option) => option.group))];
 
   return (
-    <Modal open={step !== null} title="Edit step" onClose={onClose} wide>
+    <Modal
+      open={step !== null}
+      title={asTemplate ? (templateId ? 'Edit template' : 'Design a template') : 'Edit step'}
+      onClose={onClose}
+      wide
+    >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
@@ -253,7 +382,7 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
           </div>
           <div>
             <label className="label">What to do</label>
-            <select className="input" value={action} onChange={(e) => setAction(e.target.value)}>
+            <select className="input" value={action} onChange={(e) => handleActionChange(e.target.value)}>
               {!ACTION_OPTIONS.some((option) => option.value === action) && action && (
                 <option value={action}>{action}</option>
               )}
@@ -270,43 +399,55 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
           </div>
         </div>
 
-        <div>
-          <label className="label">
-            Target device
-            {['ssh', 'adb'].includes(adapter) && !deviceId && (
-              <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
-                required — pick one so credentials are sent
-              </span>
-            )}
-          </label>
-          <select
-            className={`input ${
-              ['ssh', 'adb'].includes(adapter) && !deviceId ? 'border-amber-500/60' : ''
-            }`}
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-          >
-            <option value="">
-              {targets.length > 0
-                ? 'No specific target — use step parameters'
-                : `No ${adapter || 'matching'} targets configured (see Configuration)`}
-            </option>
-            {targets.map((config) => (
-              <option key={config.id} value={config.id}>
-                {config.label}
-                {config.last_test_ok === true ? ' ● connected' : ''}
+        {!asTemplate && (
+          <div>
+            <label className="label">
+              Target device
+              {['ssh', 'adb'].includes(adapter) && (
+                <span className="ml-2 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+                  optional override
+                </span>
+              )}
+            </label>
+            <select className="input" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
+              <option value="">
+                {['ssh', 'adb'].includes(adapter)
+                  ? `Use this test's run location${runTargetLabel ? ` — ${runTargetLabel}` : ''}`
+                  : targets.length > 0
+                    ? 'No specific target — use step parameters'
+                    : `No ${adapter || 'matching'} targets configured (see Configuration)`}
               </option>
-            ))}
-          </select>
-          <p className="mt-1 text-[11px] text-text-muted">
-            Binding a target injects its connection details and credentials, and locks
-            the device while this step runs.
-          </p>
-        </div>
+              {targets.map((config) => (
+                <option key={config.id} value={config.id}>
+                  {config.label}
+                  {config.last_test_ok === true ? ' ● connected' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {['ssh', 'adb'].includes(adapter) ? (
+                <>
+                  By default this step runs on the test's <b>Run location</b> (chosen at the
+                  top of the designer). Pick a target here only to <b>override</b> it for this
+                  one step — that injects its credentials and locks the device while it runs.
+                </>
+              ) : (
+                <>Binding a target injects its connection details and locks the device while this step runs.</>
+              )}
+            </p>
+          </div>
+        )}
 
         {/* Parameters as plain form fields — no JSON required */}
         <div>
-          <label className="label">Step settings</label>
+          <label className="label">
+            Step settings
+            {requiredMissing && (
+              <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
+                {prettyParamName(requiredKey)} required
+              </span>
+            )}
+          </label>
           <div className="space-y-2">
             {fields.map(([key, value], index) => (
               <div key={key} className="flex items-center gap-2">
@@ -330,7 +471,11 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
                 ) : (
                   <div className="flex flex-1 items-center gap-1.5">
                     <input
-                      className="input flex-1"
+                      className={`input flex-1 ${
+                        key === requiredKey && String(value).trim() === ''
+                          ? 'border-amber-500/60'
+                          : ''
+                      }`}
                       value={value}
                       placeholder={PARAM_HINTS[key] ?? ''}
                       onChange={(e) => setField(index, e.target.value)}
@@ -365,6 +510,17 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
               className="hidden"
               onChange={(e) => void handleFieldFile(e.target.files)}
             />
+            {uploadError && (
+              <p className="rounded-md border border-error/40 bg-error/10 px-2 py-1 text-xs text-error">
+                {uploadError}
+              </p>
+            )}
+            {requiredMissing && (
+              <p className="text-[11px] text-amber-600">
+                Type the path to your script/.exe, or use <b>File</b> to upload one — the
+                step won't run without it.
+              </p>
+            )}
             {fields.length === 0 && (
               <p className="text-xs text-text-muted">This action needs no settings.</p>
             )}
@@ -562,12 +718,26 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
         <div>
           <label className="label">Execution flow</label>
           <select className="input" value={flow} onChange={(e) => setFlow(e.target.value)}>
+            {/* Preserve the step's actual parallel group (B, C, …) so editing a
+                member of any group round-trips losslessly — without this it would
+                collapse into group A and you'd have to ungroup and redo. */}
+            {flow.startsWith('parallel-') && !FLOW_OPTIONS.some((o) => o.value === flow) && (
+              <option value={flow}>
+                Parallel — group {flow.replace('parallel-', '')} (runs together)
+              </option>
+            )}
             {FLOW_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
+          {flow.startsWith('parallel-') && (
+            <p className="mt-1 text-[11px] text-text-muted">
+              This step runs together with the other steps in parallel group{' '}
+              <b>{flow.replace('parallel-', '')}</b>. Editing here keeps it in that group.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -641,14 +811,111 @@ export function StepEditModal({ step, onSave, onClose }: StepEditModalProps) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
-          <button className="btn-outline" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn-primary" onClick={handleSave}>
-            Save step
-          </button>
-        </div>
+        {asTemplate ? (
+          /* Template-design mode: name + palette group, then save to the palette. */
+          <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className="label text-[11px]">Template name</label>
+                <input
+                  className="input"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="e.g. Reboot then wait for SSH"
+                />
+              </div>
+              <div>
+                <label className="label text-[11px]">Palette group</label>
+                <input
+                  className="input"
+                  value={templateGroup}
+                  onChange={(e) => setTemplateGroup(e.target.value)}
+                  placeholder="My steps"
+                />
+              </div>
+            </div>
+            {templateError && <p className="text-xs text-error">{templateError}</p>}
+            <p className="text-[11px] text-text-muted">
+              Saves to your palette under <b>{templateGroup.trim() || 'My steps'}</b> — drag it onto
+              any test to reuse it.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button className="btn-outline" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={() => void saveAsTemplate()}>
+                <BookmarkPlus size={14} /> {templateId ? 'Update template' : 'Save template'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {showTemplateForm && (
+              <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="text-xs font-semibold text-text-secondary">
+                  Save this configured step to your palette so you can reuse it on any test.
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className="label text-[11px]">Template name</label>
+                    <input
+                      className="input"
+                      value={templateName}
+                      autoFocus
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="e.g. Reboot then wait for SSH"
+                    />
+                  </div>
+                  <div>
+                    <label className="label text-[11px]">Palette group</label>
+                    <input
+                      className="input"
+                      value={templateGroup}
+                      onChange={(e) => setTemplateGroup(e.target.value)}
+                      placeholder="My steps"
+                    />
+                  </div>
+                </div>
+                {templateError && <p className="text-xs text-error">{templateError}</p>}
+                <div className="flex justify-end gap-2">
+                  <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setShowTemplateForm(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => void saveAsTemplate()}>
+                    <BookmarkPlus size={13} /> Save template
+                  </button>
+                </div>
+              </div>
+            )}
+            {templateSaved && !showTemplateForm && (
+              <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-500">
+                ✓ Saved to your palette under “{templateGroup.trim() || 'My steps'}”. Drag it onto
+                any test from the palette to reuse it.
+              </p>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                className="btn-outline mr-auto text-xs"
+                onClick={() => {
+                  setTemplateName(label.trim() || friendlyAction(action));
+                  setTemplateSaved(false);
+                  setTemplateError(null);
+                  setShowTemplateForm(true);
+                }}
+                title="Save this configured step to your palette for reuse"
+              >
+                <BookmarkPlus size={14} /> Save as template
+              </button>
+              <button className="btn-outline" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleSave}>
+                Save step
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

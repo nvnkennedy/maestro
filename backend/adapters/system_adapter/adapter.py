@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -21,12 +22,20 @@ from backend.utils.matching import check_expectations, text_matches
 
 
 def _as_args(value) -> list[str]:
-    """Normalise step args to a list. Prefer a list; a string is whitespace-split."""
+    """Normalise step args to a list.
+
+    A list is used as-is. A string is split respecting quotes (``posix=False``
+    keeps Windows backslashes intact), so a quoted path with spaces stays one
+    argument instead of being broken on whitespace.
+    """
     if value is None or value == "":
         return []
     if isinstance(value, list):
         return [str(a) for a in value]
-    return str(value).split()
+    try:
+        return shlex.split(str(value), posix=False)
+    except ValueError:
+        return str(value).split()
 
 
 def _build_command(path: Path, args: list[str], python_path: str | None) -> list[str]:
@@ -229,10 +238,14 @@ class SystemAdapter(BaseAdapter):
         from the extension). ``args`` (list or string), ``cwd``, ``env`` (dict),
         ``timeout``, ``expect_contains``, ``attach_output`` are all optional.
         """
-        raw = str(params.get("path") or params.get("script_path") or "").strip()
+        raw = str(
+            params.get("path") or params.get("script_path") or params.get("file") or ""
+        ).strip()
         if not raw:
             return AdapterResult(
-                success=False, error="Missing 'path' — point it at your script or .exe"
+                success=False,
+                error="No script selected — set 'path' to your script or .exe "
+                "(type the path, or use the File button to upload one).",
             )
         path = Path(raw)
         if not path.exists():
