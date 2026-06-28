@@ -50,12 +50,27 @@ def _resolve_tool_version(info: dict) -> None:
     module = powered_by.get("module") if isinstance(powered_by, dict) else None
     if not module:
         return
+    version: str | None = None
+    # Prefer the installed package version (this evolves every time the tool is
+    # upgraded, e.g. turbossh 1.2.24), falling back to the module's __version__.
     try:
-        import importlib
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as pkg_version
 
-        info["tool_version"] = getattr(importlib.import_module(module), "__version__", None)
+        try:
+            version = pkg_version(module)
+        except PackageNotFoundError:
+            version = None
     except Exception:
-        info["tool_version"] = None
+        version = None
+    if version is None:
+        try:
+            import importlib
+
+            version = getattr(importlib.import_module(module), "__version__", None)
+        except Exception:
+            version = None
+    info["tool_version"] = version
 
 
 def list_plugins_with_state(db: Session) -> list[dict]:

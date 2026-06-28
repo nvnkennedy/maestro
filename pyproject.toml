@@ -30,8 +30,8 @@ dependencies = [
     "pyserial>=3.5",
     "structlog>=24.1",
     "prometheus-client>=0.20",
-    "turboadb>=1.0.5",
-    "turbossh>=1.2.16",
+    "turboadb>=1.0.14",
+    "turbossh>=1.2.31",
 ]
 
 [project.optional-dependencies]

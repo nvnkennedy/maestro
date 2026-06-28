@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend import __version__
 from backend.api import (
     admin,
+    camera_live,
     configuration,
     connections,
     datasets,
@@ -39,6 +40,7 @@ api_router.include_router(plugins.router)
 api_router.include_router(datasets.router)
 api_router.include_router(scripts.router)
 api_router.include_router(templates.router)
+api_router.include_router(camera_live.router)
 api_router.include_router(admin.router)
 
 ws_router = websocket.router
@@ -47,6 +49,14 @@ ws_router = websocket.router
 @api_router.get("/health", tags=["system"])
 def health():
     return {"status": "ok", "app": "maestro", "version": __version__}
+
+
+@api_router.get("/logs", tags=["system"])
+def server_logs(limit: int = 300, _: str = Depends(require_role("read"))):
+    """Recent server log lines for the in-app Console page."""
+    from backend.utils.logger import recent_logs
+
+    return {"lines": recent_logs(limit)}
 
 
 @api_router.get("/dashboard", tags=["system"])

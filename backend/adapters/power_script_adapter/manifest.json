@@ -1,7 +1,7 @@
 {
   "name": "power",
   "display_name": "Bench power",
-  "version": "2.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Drive bench power (normal/EDL cycles, on/off) by calling your power_control.py script. Simulated when no script is configured, so test design works without a bench.",
   "powered_by": { "tool": "your power_control.py script" },

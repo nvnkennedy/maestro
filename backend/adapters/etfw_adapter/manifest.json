@@ -1,7 +1,7 @@
 {
   "name": "etfw",
   "display_name": "ETFW bus / ECU",
-  "version": "2.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Control ECU bus sleep and ECU state by calling your etfw.py bench script. Tracks the last known state and simulates transitions when no script is configured.",
   "powered_by": { "tool": "your etfw.py script" },

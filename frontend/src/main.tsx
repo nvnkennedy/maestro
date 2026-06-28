@@ -4,15 +4,18 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { ProjectProvider } from './context/ProjectContext';
 import { ToastProvider } from './components/common/Toast';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <ProjectProvider>
-          <App />
-        </ProjectProvider>
+        <ErrorBoundary>
+          <ProjectProvider>
+            <App />
+          </ProjectProvider>
+        </ErrorBoundary>
       </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>,

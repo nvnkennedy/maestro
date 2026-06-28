@@ -17,9 +17,12 @@ import json
 import uuid
 from typing import Optional
 
-from backend.config import DATA_DIR
+from backend.config import DATA_DIR, TEMPLATES_DIR
 
 _STORE = DATA_DIR / "user_templates.json"
+# Built-in templates ship read-only, so "deleting" one just hides it from the
+# palette (by stable key). This survives upgrades and can be restored.
+_HIDDEN_STORE = DATA_DIR / "hidden_builtins.json"
 
 
 def _read() -> list[dict]:
@@ -91,3 +94,49 @@ def grouped() -> dict[str, list[dict]]:
 
 def get_template(template_id: str) -> Optional[dict]:
     return next((t for t in _read() if t.get("id") == template_id), None)
+
+
+# ---- built-in templates (read-only files) + hide/restore ----------------------
+
+
+def builtin_key(group: str, item: dict) -> str:
+    """Stable id for a built-in (the shipped files carry no id of their own)."""
+    return f"{group}::{item.get('action', '')}::{item.get('label', '')}"
+
+
+def load_builtins() -> dict[str, list[dict]]:
+    """Built-in templates from ``backend/templates/*_templates.json`` by group."""
+    out: dict[str, list[dict]] = {}
+    for path in sorted(TEMPLATES_DIR.glob("*_templates.json")):
+        group = path.stem.replace("_templates", "")
+        try:
+            items = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        if isinstance(items, list):
+            out[group] = items
+    return out
+
+
+def _read_hidden() -> set[str]:
+    if not _HIDDEN_STORE.exists():
+        return set()
+    try:
+        data = json.loads(_HIDDEN_STORE.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return set()
+    return set(data) if isinstance(data, list) else set()
+
+
+def list_hidden_builtins() -> list[str]:
+    return sorted(_read_hidden())
+
+
+def set_builtin_hidden(key: str, hidden: bool) -> None:
+    keys = _read_hidden()
+    if hidden:
+        keys.add(key)
+    else:
+        keys.discard(key)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _HIDDEN_STORE.write_text(json.dumps(sorted(keys), indent=2), encoding="utf-8")

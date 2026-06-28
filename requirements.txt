@@ -9,8 +9,8 @@ cryptography>=42.0
 websockets>=11.0
 
 # Device tooling — the adb/ssh adapters call your own tools
-turboadb>=1.0.5
-turbossh>=1.2.16
+turboadb>=1.0.14
+turbossh>=1.2.31
 
 # Optional (graceful fallbacks exist when missing)
 structlog>=24.1

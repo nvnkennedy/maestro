@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
+import { notify } from './notify';
 import type {
   AdapterHealth,
   DashboardStats,
@@ -30,6 +31,26 @@ export const client = axios.create({ baseURL: '/api' });
 if (apiToken) {
   client.defaults.headers.common['X-Maestro-Token'] = apiToken;
 }
+
+function friendlyError(error: AxiosError): string {
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+    return 'Cannot reach the Maestro server — is it still running?';
+  }
+  const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail;
+  if (typeof detail === 'string') return detail;
+  return error.message || 'Something went wrong';
+}
+
+// Surface server/framework failures (5xx + network) as a global popup. 4xx
+// (validation / not-found) are left to the calling code to report specifically.
+client.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    const status = error.response?.status;
+    if (!status || status >= 500) notify('error', friendlyError(error));
+    return Promise.reject(error);
+  },
+);
 
 // ---- acting user identity ---------------------------------------------------
 
@@ -285,6 +306,59 @@ export const saveUserTemplate = (body: UserTemplate) =>
     ? client.put<UserTemplate>(`/templates/${body.id}`, body).then((r) => r.data)
     : client.post<UserTemplate>('/templates', body).then((r) => r.data);
 export const deleteUserTemplate = (id: string) => client.delete(`/templates/${id}`);
+
+/** Built-in template with a stable key + whether it's hidden from the palette. */
+export interface BuiltinTemplate {
+  key: string;
+  hidden: boolean;
+  label: string;
+  action: string;
+  parameters: Record<string, unknown>;
+  timeout_seconds: number;
+  description?: string;
+  category?: string;
+}
+export const getBuiltinTemplates = () =>
+  client.get<Record<string, BuiltinTemplate[]>>('/templates/builtin').then((r) => r.data);
+export const setBuiltinHidden = (key: string, hidden: boolean) =>
+  client.post('/templates/builtin/hidden', { key, hidden }).then((r) => r.data);
+
+// ---- live camera / desktop feed ----------------------------------------------
+
+export interface CameraSources {
+  ffmpeg: boolean;
+  cameras: string[];
+  desktop: boolean;
+}
+
+export const getCameraSources = () =>
+  client.get<CameraSources>('/camera/sources').then((r) => r.data);
+
+// ---- in-app server console ---------------------------------------------------
+
+export interface LogLine {
+  ts: string;
+  level: string;
+  logger: string;
+  message: string;
+}
+export const getServerLogs = (limit = 300) =>
+  client.get<{ lines: LogLine[] }>('/logs', { params: { limit } }).then((r) => r.data.lines);
+
+/** URL for an `<img>` to render the live MJPEG feed (token appended when set). */
+export function liveCameraUrl(opts: {
+  source: 'webcam' | 'desktop';
+  camera?: string;
+  fps?: number;
+  width?: number;
+}): string {
+  const p = new URLSearchParams({ source: opts.source });
+  if (opts.camera) p.set('camera', opts.camera);
+  if (opts.fps) p.set('fps', String(opts.fps));
+  if (opts.width) p.set('width', String(opts.width));
+  if (apiToken) p.set('token', apiToken);
+  return `/api/camera/live?${p.toString()}`;
+}
 
 // ---- plugins / health / dashboard ---------------------------------------------
 

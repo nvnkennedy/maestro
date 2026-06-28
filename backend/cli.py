@@ -82,12 +82,31 @@ def main() -> None:
         run_setup()
         return
 
+    # A windowless launcher (pythonw.exe, used by the desktop shortcut) has no
+    # console, so sys.stdout/stderr are None — give them a sink so prints and
+    # uvicorn don't crash. The in-app Console page + log file still capture all.
+    if sys.stdout is None or sys.stderr is None:
+        sink = open(os.devnull, "w", encoding="utf-8")
+        if sys.stdout is None:
+            sys.stdout = sink
+        if sys.stderr is None:
+            sys.stderr = sink
+
     import uvicorn
 
     from backend.config import get_settings
     from backend.main import create_app
 
     settings = get_settings()
+
+    # Keep the desktop shortcut current after upgrades (best-effort, Windows-only).
+    try:
+        from backend.utils.shortcut import ensure_desktop_shortcut
+
+        ensure_desktop_shortcut()
+    except Exception:
+        pass
+
     app = create_app(serve_frontend=True)
     port = _resolve_port(settings.host, settings.port)
     url = f"http://localhost:{port}"
@@ -97,8 +116,10 @@ def main() -> None:
     if settings.open_browser:
         _open_browser_later(url, port, settings.host)
 
-    # Quieter console: show warnings/errors, not every request line.
-    uvicorn.run(app, host=settings.host, port=port, log_level="warning")
+    # log_config=None: don't let uvicorn install its own (non-propagating) logging
+    # handlers — its logs then flow to our root handlers, so they show in cmd AND
+    # in the in-app Console. log_level="warning" keeps per-request lines quiet.
+    uvicorn.run(app, host=settings.host, port=port, log_level="warning", log_config=None)
 
 
 if __name__ == "__main__":

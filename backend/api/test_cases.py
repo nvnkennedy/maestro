@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend import __version__
-from backend.config import ARTIFACTS_DIR, TEMPLATES_DIR
+from backend.config import ARTIFACTS_DIR
 from backend.database import get_db
 from backend.models.project import Project, TestCase, TestStep
 from backend.security.audit import record_audit
@@ -114,15 +114,19 @@ def list_templates(_: str = Depends(require_role("read"))):
     ready-to-drop palette item.
     """
     from backend.services.script_registry import as_templates
-    from backend.services.template_store import grouped
+    from backend.services.template_store import (
+        builtin_key,
+        grouped,
+        list_hidden_builtins,
+        load_builtins,
+    )
 
     templates: dict[str, list] = {}
-    for path in sorted(TEMPLATES_DIR.glob("*_templates.json")):
-        key = path.stem.replace("_templates", "")
-        try:
-            templates[key] = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
-            continue
+    hidden = set(list_hidden_builtins())
+    for group, items in load_builtins().items():
+        visible = [it for it in items if builtin_key(group, it) not in hidden]
+        if visible:
+            templates[group] = visible
 
     # User-defined templates (writable), bucketed under their chosen group.
     for group, items in grouped().items():

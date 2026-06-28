@@ -30,7 +30,7 @@ export function PluginsPage() {
                   <div>
                     <div className="font-semibold">{plugin.display_name ?? plugin.name}</div>
                     <div className="font-mono text-xs text-text-muted">
-                      {plugin.name} · v{plugin.version ?? '1.0.0'} · {plugin.type ?? 'adapter'}
+                      {plugin.name} · adapter v{plugin.version ?? '2.1.0'} · {plugin.type ?? 'adapter'}
                     </div>
                   </div>
                 </div>
@@ -55,12 +55,25 @@ export function PluginsPage() {
               </div>
 
               {plugin.powered_by && (
-                <div className="mb-3 inline-flex items-center gap-1.5 self-start rounded-md bg-surface-2 px-2 py-1 text-xs text-text-secondary">
+                <div
+                  className="mb-3 inline-flex items-center gap-1.5 self-start rounded-md bg-surface-2 px-2 py-1 text-xs text-text-secondary"
+                  title="The actual tool version installed right now — it updates whenever you upgrade the tool (pip install -U)."
+                >
                   <Cpu size={13} className="text-secondary" />
                   <span>
                     Powered by{' '}
                     <span className="font-medium text-text-primary">{plugin.powered_by.tool}</span>
-                    {plugin.tool_version ? ` ${plugin.tool_version}` : ''}
+                    {plugin.tool_version ? (
+                      <>
+                        {' '}
+                        <span className="font-semibold text-secondary">v{plugin.tool_version}</span>
+                        <span className="ml-1.5 rounded bg-success/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-success">
+                          live
+                        </span>
+                      </>
+                    ) : (
+                      <span className="ml-1 text-text-muted">(not installed)</span>
+                    )}
                   </span>
                 </div>
               )}

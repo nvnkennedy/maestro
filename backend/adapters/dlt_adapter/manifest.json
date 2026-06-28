@@ -1,7 +1,7 @@
 {
   "name": "dlt",
   "display_name": "DLT logging",
-  "version": "2.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Capture automotive DLT logs — either by calling your dlt.py bench script (start/stop/capture) or via the built-in TCP capture when no script is set — then verify patterns and attach the .dlt to the report.",
   "powered_by": { "tool": "your dlt.py script (or built-in TCP capture)" },

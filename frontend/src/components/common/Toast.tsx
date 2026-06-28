@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { registerNotifier } from '../../services/notify';
 
 type ToastKind = 'success' | 'error' | 'info';
 interface ToastItem {
@@ -21,12 +22,24 @@ const STYLES: Record<ToastKind, string> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const lastRef = useRef<{ message: string; at: number }>({ message: '', at: 0 });
 
   const push = useCallback((kind: ToastKind, message: string) => {
-    const id = Date.now() + Math.random();
+    // Drop a repeat of the same message within ~1.2s (e.g. a global interceptor
+    // and a local catch both reporting one failure).
+    const now = Date.now();
+    if (message === lastRef.current.message && now - lastRef.current.at < 1200) return;
+    lastRef.current = { message, at: now };
+    const id = now + Math.random();
     setToasts((current) => [...current, { id, kind, message }]);
     setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), 4000);
   }, []);
+
+  // Let non-React code (axios interceptor, error boundary) raise toasts too.
+  useEffect(() => {
+    registerNotifier(push);
+    return () => registerNotifier(null);
+  }, [push]);
 
   return (
     <ToastContext.Provider value={push}>

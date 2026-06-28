@@ -1,6 +1,6 @@
 {
   "name": "camera",
-  "version": "1.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Windows desktop screenshots and camera video capture",
   "capabilities": ["screenshot", "capture", "capture_webcam", "record_video", "list_devices", "detect"],

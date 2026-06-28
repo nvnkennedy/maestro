@@ -137,22 +137,29 @@ class WindowsCameraAdapter(BaseAdapter):
         return result
 
     async def _detect(self, params: dict) -> AdapterResult:
-        """Detect cameras attached to this machine (no manual config needed)."""
+        """Detect cameras attached to this machine (no manual config needed).
+
+        Only the Windows ``Camera`` PnP class is queried. The legacy ``Image``
+        class also covers scanners and virtual imaging devices, so including it
+        listed bogus "cameras"; names are de-duplicated too.
+        """
         if not sys.platform.startswith("win"):
             return AdapterResult(success=False, error="Camera detection requires Windows")
         script = (
             "Get-CimInstance Win32_PnPEntity | "
-            "Where-Object { $_.PNPClass -in @('Camera','Image') -and $_.Status -eq 'OK' } | "
+            "Where-Object { $_.PNPClass -eq 'Camera' -and $_.Status -eq 'OK' } | "
             "Select-Object -ExpandProperty Name"
         )
         result = await self._run_subprocess(
             ["powershell", "-NoProfile", "-Command", script], timeout=30
         )
-        devices = [
-            {"name": line.strip(), "kind": "camera"}
-            for line in result.output.splitlines()
-            if line.strip()
-        ]
+        seen: set[str] = set()
+        devices: list[dict] = []
+        for line in result.output.splitlines():
+            name = line.strip()
+            if name and name not in seen:
+                seen.add(name)
+                devices.append({"name": name, "kind": "camera"})
         return AdapterResult(
             success=True,
             output="\n".join(d["name"] for d in devices) or "No cameras detected",

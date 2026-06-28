@@ -1,7 +1,7 @@
 {
   "name": "ssh",
   "display_name": "SSH / Remote target",
-  "version": "2.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Run commands, move files and capture logs on Linux/QNX targets and Windows/RDP boxes over SSH — plus webcam capture and remote-desktop (RDP) screenshot/recording. Powered by your turbossh tool.",
   "powered_by": { "tool": "turbossh", "module": "turbossh" },
@@ -31,6 +31,6 @@
     "Camera": ["camera_list", "camera_screenshot", "camera_record", "remote_camera_capture"],
     "RDP capture": ["rdp_screenshot", "rdp_record"]
   },
-  "dependencies": ["turbossh>=1.2.16"],
+  "dependencies": ["turbossh>=1.2.31"],
   "entry_point": "adapter:SSHAdapter"
 }

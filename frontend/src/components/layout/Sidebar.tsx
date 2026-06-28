@@ -8,6 +8,8 @@ import {
   FileBarChart2,
   FileCode2,
   Cpu,
+  Video,
+  TerminalSquare,
   BookOpen,
 } from 'lucide-react';
 import { canLeave } from '../../utils/navGuard';
@@ -23,6 +25,8 @@ const NAV_ITEMS = [
   { to: '/templates', label: 'Templates', icon: FileCode2, color: 'text-pink-400' },
   { to: '/reports', label: 'Reports', icon: FileBarChart2, color: 'text-rose-400' },
   { to: '/plugins', label: 'Plugins', icon: Cpu, color: 'text-cyan-400' },
+  { to: '/live', label: 'Live Feed', icon: Video, color: 'text-purple-400' },
+  { to: '/console', label: 'Console', icon: TerminalSquare, color: 'text-slate-300' },
   { to: '/help', label: 'Help & Readme', icon: BookOpen, color: 'text-teal-400' },
 ];
 

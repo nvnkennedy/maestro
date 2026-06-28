@@ -7,6 +7,8 @@ import { ConfigurationPage } from './pages/ConfigurationPage';
 import { TemplateManagerPage } from './pages/TemplateManagerPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { PluginsPage } from './pages/PluginsPage';
+import { LiveFeedPage } from './pages/LiveFeedPage';
+import { ConsolePage } from './pages/ConsolePage';
 import { HelpPage } from './pages/HelpPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -22,6 +24,8 @@ export default function App() {
       <Route path="/templates" element={<TemplateManagerPage />} />
       <Route path="/reports" element={<ReportsPage />} />
       <Route path="/plugins" element={<PluginsPage />} />
+      <Route path="/live" element={<LiveFeedPage />} />
+      <Route path="/console" element={<ConsolePage />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

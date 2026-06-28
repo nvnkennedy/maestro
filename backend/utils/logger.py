@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,6 +23,51 @@ except ImportError:  # pragma: no cover - depends on environment
     _HAS_STRUCTLOG = False
 
 _configured = False
+
+# In-memory ring buffer of recent log lines, surfaced by the in-app Console
+# page (/api/logs) so you don't need the external cmd window to see activity.
+_LOG_BUFFER: "deque[dict]" = deque(maxlen=1000)
+
+
+def _record_line(level: str, logger_name: str, message: str, ts: str | None = None) -> None:
+    _LOG_BUFFER.append(
+        {
+            "ts": ts or datetime.now(timezone.utc).isoformat(),
+            "level": (level or "info").lower(),
+            "logger": logger_name or "",
+            "message": message or "",
+        }
+    )
+
+
+def recent_logs(limit: int = 300) -> list[dict]:
+    """The most recent buffered log lines (newest last)."""
+    items = list(_LOG_BUFFER)
+    return items[-limit:] if limit else items
+
+
+class _BufferHandler(logging.Handler):
+    """Mirror stdlib log records (uvicorn, apscheduler, …) into the console buffer."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            _record_line(record.levelname, record.name, record.getMessage())
+        except Exception:
+            pass
+
+
+def _buffer_processor(logger, method_name, event_dict):
+    """structlog processor: mirror Maestro's own events into the console buffer."""
+    try:
+        _record_line(
+            str(event_dict.get("level", method_name)),
+            str(event_dict.get("logger", "")),
+            str(event_dict.get("event", "")),
+            ts=event_dict.get("timestamp"),
+        )
+    except Exception:
+        pass
+    return event_dict
 
 
 class _JsonFormatter(logging.Formatter):
@@ -84,6 +130,7 @@ def setup_logging() -> None:
     root.setLevel(level)
     root.addHandler(file_handler)
     root.addHandler(stream_handler)
+    root.addHandler(_BufferHandler())
 
     if _HAS_STRUCTLOG:
         structlog.configure(
@@ -93,6 +140,7 @@ def setup_logging() -> None:
                 structlog.processors.TimeStamper(fmt="iso", utc=True),
                 structlog.processors.StackInfoRenderer(),
                 structlog.processors.format_exc_info,
+                _buffer_processor,
                 structlog.processors.JSONRenderer(),
             ],
             wrapper_class=structlog.make_filtering_bound_logger(level),

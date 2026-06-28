@@ -30,6 +30,8 @@ interface StepEditModalProps {
   asTemplate?: boolean;
   templateId?: string;
   initialGroup?: string;
+  /** Existing palette groups, offered as a dropdown when naming the group. */
+  groupOptions?: string[];
   onTemplateSaved?: () => void;
 }
 
@@ -76,6 +78,7 @@ export function StepEditModal({
   asTemplate = false,
   templateId,
   initialGroup,
+  groupOptions = [],
   onTemplateSaved,
 }: StepEditModalProps) {
   const { activeProjectId } = useProject();
@@ -370,6 +373,11 @@ export function StepEditModal({
       wide
     >
       <div className="space-y-4">
+        <datalist id="maestro-template-groups">
+          {groupOptions.map((g) => (
+            <option key={g} value={g} />
+          ))}
+        </datalist>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="label">Step name</label>
@@ -828,9 +836,10 @@ export function StepEditModal({
                 <label className="label text-[11px]">Palette group</label>
                 <input
                   className="input"
+                  list="maestro-template-groups"
                   value={templateGroup}
                   onChange={(e) => setTemplateGroup(e.target.value)}
-                  placeholder="My steps"
+                  placeholder="Pick a group or type a new one"
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
 {
   "name": "system",
-  "version": "1.0.0",
+  "version": "2.1.5",
   "type": "adapter",
   "description": "Local utility steps: wait, echo, assert, sandboxed scripts",
   "capabilities": ["wait", "echo", "assert_contains", "run_script", "fail"],
